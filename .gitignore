@@ -1,0 +1,4 @@
+/dist
+/.vscode
+/deno.lock
+node_modules
