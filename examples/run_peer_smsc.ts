@@ -66,10 +66,10 @@ function toDrDate(date: Date): string {
             enquireLinkIntervalMs: 5000,
             responseTimeoutMs: 5000,
             signal: abortController.signal,
-            tapIncomingPdu(pdu) {
+            tapIncomingPdu(_pdu) {
               // console.log(renderSmppPduAsTable(pdu));
             },
-            tapOutgoingPdu(pdu) {
+            tapOutgoingPdu(_pdu) {
               // console.log(renderSmppPduAsTable(pdu));
             },
           });

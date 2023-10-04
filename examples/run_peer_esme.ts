@@ -118,11 +118,11 @@ async function expectMtResps(forMtCtxs: Set<MtCtx>) {
   throw new Error(`Expected an MT response but got none`);
 }
 
-async function expectMtResp(forMtCtx: MtCtx) {
+async function _expectMtResp(forMtCtx: MtCtx) {
   return await expectMtResps(new Set([forMtCtx]));
 }
 
-async function expectDr(withMessageId: string, discardUnmatched = false) {
+async function _expectDr(withMessageId: string, discardUnmatched = false) {
   return await expectDrs(new Set([withMessageId]), discardUnmatched);
 }
 
