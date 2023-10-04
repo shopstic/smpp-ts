@@ -1,0 +1,15 @@
+{
+  "fmt": {
+    "include": [
+      "src/",
+      "examples/"
+    ],
+    "lineWidth": 120
+  },
+  "lint": {
+    "include": [
+      "src/",
+      "examples/"
+    ]
+  }
+}

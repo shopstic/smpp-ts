@@ -1,5 +1,5 @@
 {
-  description = "SMPP TypeScript";
+  description = "SMPP in pure TypeScript";
 
   inputs = {
     hotPot.url = "github:shopstic/nix-hot-pot";
@@ -43,9 +43,6 @@
           runtimeInputs = builtins.attrValues
             {
               inherit deno;
-              inherit (pkgs)
-                nodejs-18_x
-                ;
             };
         in
         rec {
