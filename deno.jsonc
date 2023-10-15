@@ -1,6 +1,10 @@
 {
+  "tasks": {
+    "check": "deno check ./src/**/*.ts"
+  },
   "fmt": {
     "include": [
+      "bench/",
       "src/",
       "examples/"
     ],
@@ -8,6 +12,7 @@
   },
   "lint": {
     "include": [
+      "bench/",
       "src/",
       "examples/"
     ]

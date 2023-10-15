@@ -22,10 +22,7 @@ import {
 import { decodePdu } from "./decoder.ts";
 import { readSmppPdus } from "./read_pdus.ts";
 import { deferred, delay, writeAll } from "./deps/std.ts";
-import {
-  prettifySmppCommandId,
-  prettifySmppCommandStatus,
-} from "./prettify.ts";
+import { prettifySmppCommandId, prettifySmppCommandStatus } from "./prettify.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
 import {
   AsyncQueue,
@@ -97,6 +94,8 @@ type RunnableSmppPeer<LocalMsgCtx> = {
   }) => Promise<Record<string, PromiseSettledResult<unknown>>>;
 };
 
+const MAX_SEQUENCE_NUMBER = 0x7FFFFFFE;
+
 export function createSmppPeer<
   LocalMsgCtx,
 >(
@@ -142,6 +141,9 @@ export function createSmppPeer<
   let localMessageRequestQueue:
     | AsyncReadonlyQueue<PduWithContext<MessageRequest, LocalMsgCtx>>
     | null = null;
+
+  let outstandingRemoteUnbindRequest: Unbind | null = null;
+
   const connReadPromise = deferred<void>();
 
   const remoteResponseQueues = {
@@ -171,12 +173,34 @@ export function createSmppPeer<
 
   const enqueueLocalRequest = (() => {
     let sequenceNumber = 0;
+    let unbound = false;
+
+    const nextSeq = () => {
+      if (sequenceNumber >= MAX_SEQUENCE_NUMBER) {
+        sequenceNumber = 0;
+      }
+      return ++sequenceNumber;
+    };
+
     return async (pdu: SmppPdu, context?: unknown) => {
-      await localRequestQueue.enqueue({
+      if (!unbound && pdu.commandId === SmppCommandId.Unbind) {
+        unbound = true;
+        return await localRequestQueue.enqueue({
+          context,
+          pdu: {
+            ...pdu,
+            sequenceNumber: nextSeq(),
+          },
+        }).finally(() => localRequestQueue.complete());
+      } else if (unbound) {
+        return false;
+      }
+
+      return await localRequestQueue.enqueue({
         context,
         pdu: {
           ...pdu,
-          sequenceNumber: ++sequenceNumber,
+          sequenceNumber: nextSeq(),
         },
       });
     };
@@ -201,11 +225,7 @@ export function createSmppPeer<
       for await (
         const raw of readSmppPdus(connection)
       ) {
-        if (incomingRawQueue.isCompleted) {
-          return;
-        }
-
-        incomingRawQueue.enqueue(raw);
+        if (incomingRawQueue.isCompleted || !await incomingRawQueue.enqueue(raw)) return;
       }
     } catch (e) {
       if (!incomingRawQueue.isCompleted) {
@@ -224,9 +244,9 @@ export function createSmppPeer<
         tapIncomingPdu?.(pdu);
 
         if (isPduRequest(pdu)) {
-          await remoteRequestQueue.enqueue(pdu);
+          if (!await remoteRequestQueue.enqueue(pdu)) return;
         } else if (isPduResponse(pdu)) {
-          await remoteResponseQueue.enqueue(pdu);
+          if (!await remoteResponseQueue.enqueue(pdu)) return;
         } else {
           throw new Error(
             `No handler for commandId=${pdu.commandId}\n${JSON.stringify(pdu)}`,
@@ -252,17 +272,9 @@ export function createSmppPeer<
 
           await outgoingQueue.enqueue(enquireLinkResp);
         } else if (pdu.commandId === SmppCommandId.Unbind) {
-          const unbindResp: UnbindResp = {
-            commandId: SmppCommandId.UnbindResp,
-            commandStatus: SmppKnownCommandStatus.ESME_ROK,
-            sequenceNumber: pdu.sequenceNumber,
-          };
-
-          if (!outgoingQueue.isCompleted) {
-            await outgoingQueue.enqueue(unbindResp);
-          }
-
-          internalAc.abort();
+          localRequestQueue.complete();
+          remoteMessageRequestQueue.complete();
+          outstandingRemoteUnbindRequest = pdu;
         } else if (
           (role === "esme" && pdu.commandId === SmppCommandId.DeliverSm) ||
           role === "smsc" && pdu.commandId === SmppCommandId.SubmitSm
@@ -270,9 +282,7 @@ export function createSmppPeer<
           await remoteMessageRequestQueue.enqueue(pdu);
         } else {
           throw new Error(
-            `No handler for remote request with command_id=${
-              prettifySmppCommandId(pdu.commandId)
-            }`,
+            `No handler for remote request with command_id=${prettifySmppCommandId(pdu.commandId)}`,
           );
         }
       }
@@ -306,6 +316,17 @@ export function createSmppPeer<
       throw e;
     } finally {
       localCorrelationMatchQueue.complete();
+
+      if (outstandingRemoteUnbindRequest && !outgoingQueue.isCompleted) {
+        const unbindResp: UnbindResp = {
+          commandId: SmppCommandId.UnbindResp,
+          commandStatus: SmppKnownCommandStatus.ESME_ROK,
+          sequenceNumber: outstandingRemoteUnbindRequest.sequenceNumber,
+        };
+        outstandingRemoteUnbindRequest = null;
+
+        await outgoingQueue.enqueue(unbindResp);
+      }
     }
   }
 
@@ -317,17 +338,17 @@ export function createSmppPeer<
         const { pdu } = request;
 
         if (role === "esme" && isPduBindRequest(pdu)) {
-          remoteResponseQueues.bind.enqueue({
+          await remoteResponseQueues.bind.enqueue({
             request: pdu,
             response: response as BindResponse,
           });
         } else if (pdu.commandId === SmppCommandId.Unbind) {
-          remoteResponseQueues.unbind.enqueue({
+          await remoteResponseQueues.unbind.enqueue({
             request: pdu,
             response: response as UnbindResp,
           });
         } else if (pdu.commandId === SmppCommandId.EnquireLink) {
-          remoteResponseQueues.enquireLink.enqueue({
+          await remoteResponseQueues.enquireLink.enqueue({
             request: pdu,
             response: response as EnquireLinkResp,
           });
@@ -335,7 +356,7 @@ export function createSmppPeer<
           (role === "esme" && pdu.commandId === SmppCommandId.SubmitSm) ||
           role === "smsc" && pdu.commandId === SmppCommandId.DeliverSm
         ) {
-          remoteResponseQueues.message.enqueue({
+          await remoteResponseQueues.message.enqueue({
             request: request as PduWithContext<MessageRequest, LocalMsgCtx>,
             response: response as MessageResponse,
           });
@@ -368,17 +389,13 @@ export function createSmppPeer<
       for await (const { response } of remoteResponseQueues.bind.items()) {
         if (response.commandId !== SmppCommandId.BindTransceiverResp) {
           throw new Error(
-            `Unexpected SMSC bind response command_id=${
-              prettifySmppCommandId(response.commandId)
-            }`,
+            `Unexpected SMSC bind response command_id=${prettifySmppCommandId(response.commandId)}`,
           );
         }
 
         if (response.commandStatus !== SmppKnownCommandStatus.ESME_ROK) {
           throw new Error(
-            `Unexpected SMSC bind response command_status=${
-              prettifySmppCommandStatus(response.commandStatus)
-            }`,
+            `Unexpected SMSC bind response command_status=${prettifySmppCommandStatus(response.commandStatus)}`,
           );
         }
 
@@ -396,9 +413,7 @@ export function createSmppPeer<
       for await (const request of remoteRequestQueue.items()) {
         if (!isPduBindRequest(request)) {
           throw new Error(
-            `Expected a bind request PDU from ESME, instead got command_id=${
-              prettifySmppCommandId(request.commandId)
-            }`,
+            `Expected a bind request PDU from ESME, instead got command_id=${prettifySmppCommandId(request.commandId)}`,
           );
         }
 
@@ -430,25 +445,21 @@ export function createSmppPeer<
       sequenceNumber: 0,
     };
 
-    await enqueueLocalRequest(unbind);
+    if (await enqueueLocalRequest(unbind)) {
+      for await (const { response } of remoteResponseQueues.unbind.items()) {
+        if (response.commandId !== SmppCommandId.UnbindResp) {
+          throw new Error(
+            `Unexpected unbind response commandId ${prettifySmppCommandId(response.commandId)}`,
+          );
+        }
 
-    for await (const { response } of remoteResponseQueues.unbind.items()) {
-      if (response.commandId !== SmppCommandId.UnbindResp) {
-        throw new Error(
-          `Unexpected unbind response commandId ${
-            prettifySmppCommandId(response.commandId)
-          }`,
-        );
+        if (response.commandStatus !== SmppKnownCommandStatus.ESME_ROK) {
+          throw new Error(
+            `Unexpected unbind commandStatus ${prettifySmppCommandStatus(response.commandStatus)}`,
+          );
+        }
+        break;
       }
-
-      if (response.commandStatus !== SmppKnownCommandStatus.ESME_ROK) {
-        throw new Error(
-          `Unexpected unbind commandStatus ${
-            prettifySmppCommandStatus(response.commandStatus)
-          }`,
-        );
-      }
-      break;
     }
   }
 
@@ -463,33 +474,29 @@ export function createSmppPeer<
       sequenceNumber: 0,
     };
 
-    await enqueueLocalRequest(enquireLink);
+    return !localRequestQueue.isCompleted && await enqueueLocalRequest(enquireLink);
   }
 
   async function loopLocalEnquireLinks() {
     try {
-      await sendEnquireLink();
+      if (!await sendEnquireLink()) return;
 
       for await (
         const { response } of remoteResponseQueues.enquireLink.items()
       ) {
         if (response.commandId !== SmppCommandId.EnquireLinkResp) {
           throw new Error(
-            `Unexpected enquire_link response commandId=${
-              prettifySmppCommandId(response.commandId)
-            }`,
+            `Unexpected enquire_link response commandId=${prettifySmppCommandId(response.commandId)}`,
           );
         }
 
         if (response.commandStatus !== SmppKnownCommandStatus.ESME_ROK) {
           throw new Error(
-            `Unexpected enquire_link response commandStatus=${
-              prettifySmppCommandStatus(response.commandStatus)
-            }`,
+            `Unexpected enquire_link response commandStatus=${prettifySmppCommandStatus(response.commandStatus)}`,
           );
         }
 
-        await sendEnquireLink();
+        if (!await sendEnquireLink()) return;
       }
     } catch (e) {
       internalAc.abort();
@@ -505,9 +512,7 @@ export function createSmppPeer<
     localMessageRequestQueue = messageRequestQueue;
     try {
       for await (const { pdu, context } of localMessageRequestQueue.items()) {
-        if (!localRequestQueue.isCompleted) {
-          await enqueueLocalRequest(pdu, context);
-        }
+        if (localRequestQueue.isCompleted || !await enqueueLocalRequest(pdu, context)) return;
       }
     } catch (e) {
       internalAc.abort();
@@ -520,11 +525,10 @@ export function createSmppPeer<
   ) {
     try {
       for await (const messageRequest of remoteMessageRequestQueue.items()) {
-        if (!localMessageResponsePromiseQueue.isCompleted) {
-          await localMessageResponsePromiseQueue.enqueue(
-            handler(messageRequest),
-          );
-        }
+        if (
+          localMessageResponsePromiseQueue.isCompleted ||
+          !await localMessageResponsePromiseQueue.enqueue(handler(messageRequest))
+        ) return;
       }
     } catch (e) {
       internalAc.abort();
@@ -537,9 +541,7 @@ export function createSmppPeer<
       for await (
         const messageResponse of localMessageResponsePromiseQueue.items()
       ) {
-        if (!outgoingQueue.isCompleted) {
-          await outgoingQueue.enqueue(messageResponse);
-        }
+        if (outgoingQueue.isCompleted || !await outgoingQueue.enqueue(messageResponse)) return;
       }
     } catch (e) {
       internalAc.abort();

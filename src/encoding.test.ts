@@ -1,10 +1,5 @@
 import { assertEquals, decodeHexString, encodeHexString } from "./deps/std.ts";
-import {
-  SmppEsmClass,
-  SmppFeature,
-  SmppMessageType,
-  SmppMessagingMode,
-} from "./esm_class.ts";
+import { SmppEsmClass, SmppFeature, SmppMessageType, SmppMessagingMode } from "./esm_class.ts";
 import { SmppKnownTlvTag, SmppTlvs } from "./tlv.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
 import {
@@ -22,18 +17,8 @@ import {
   SubmitSmResp,
   WithCommandLength,
 } from "./common.ts";
-import {
-  decodeBindRequest,
-  decodeBindResponse,
-  decodeMessageRequest,
-  decodeMessageResponse,
-} from "./decoder.ts";
-import {
-  encodeBindRequest,
-  encodeBindResponse,
-  encodeMessageRequest,
-  encodeMessageResponse,
-} from "./encoder.ts";
+import { decodeBindRequest, decodeBindResponse, decodeMessageRequest, decodeMessageResponse } from "./decoder.ts";
+import { encodeBindRequest, encodeBindResponse, encodeMessageRequest, encodeMessageResponse } from "./encoder.ts";
 import { SmppRegisteredDelivery } from "./registered_delivery.ts";
 
 Deno.test("BindRequest serdes", async (t) => {
@@ -65,9 +50,7 @@ Deno.test("BindRequest serdes", async (t) => {
     addressRange: "61626300", // abc
   };
 
-  const expectedInHex = BindRequestKeys.map((key) =>
-    expected[key].toLowerCase()
-  ).join("");
+  const expectedInHex = BindRequestKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
     const actualInHex = encodeHexString(encodeBindRequest(pdu));
@@ -102,9 +85,7 @@ Deno.test("BindResponse", async (t) => {
     tlvs: "0210000401020304",
   };
 
-  const expectedInHex = BindResponseKeys.map((key) =>
-    expected[key].toLowerCase()
-  ).join("");
+  const expectedInHex = BindResponseKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
     const actualInHex = encodeHexString(encodeBindResponse(pdu));
@@ -178,9 +159,7 @@ Deno.test("MessageRequest", async (t) => {
     tlvs: "130C000401020304",
   };
 
-  const expectedInHex = MessageRequestKeys.map((key) =>
-    expected[key].toLowerCase()
-  ).join("");
+  const expectedInHex = MessageRequestKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
     const actualInHex = encodeHexString(encodeMessageRequest(pdu));
@@ -212,9 +191,7 @@ Deno.test("MessageResponse", async (t) => {
     tlvs: "",
   };
 
-  const expectedInHex = MessageResponseKeys.map((key) =>
-    expected[key].toLowerCase()
-  ).join("");
+  const expectedInHex = MessageResponseKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
     const actualInHex = encodeHexString(encodeMessageResponse(pdu));
