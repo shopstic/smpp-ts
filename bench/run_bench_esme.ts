@@ -1,6 +1,7 @@
 import { smppCharsetEncode } from "../src/charset.ts";
 import { SmppKnownCommandStatus } from "../src/command_status.ts";
 import { SmppCommandId, SmppKnownDataCoding, SmppNpi, SmppSupportedCharset, SmppTon, SubmitSm } from "../src/common.ts";
+import { delay } from "../src/deps/std.ts";
 import { promiseAllSettledTogether } from "../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../src/esm_class.ts";
 import { SmppRegisteredDelivery } from "../src/registered_delivery.ts";
@@ -141,28 +142,34 @@ const connectionCount = 10;
 
 try {
   const promises = Array.from({ length: connectionCount }).map(async (_, i) => {
-    const ac = new AbortController();
-    const onAbort = () => ac.abort();
-    abortSignal.addEventListener("abort", onAbort, { once: true });
+    while (!abortSignal.aborted) {
+      const ac = new AbortController();
+      const onAbort = () => ac.abort();
+      abortSignal.addEventListener("abort", onAbort, { once: true });
 
-    try {
-      const { controller, esmePromise } = await runBenchEsme<string>({
-        systemId: "test",
-        password: "test",
-        smscHostname: "localhost",
-        smscPort: 12775,
-        windowSize: 100,
-        logger: logger.prefixed(AnsiColors.gray(String(i))),
-        signal: ac.signal,
-        mtPerSecondRateLimit: 20000,
-      });
+      try {
+        const { controller, esmePromise } = await runBenchEsme<string>({
+          systemId: "test",
+          password: "test",
+          smscHostname: "127.0.0.1",
+          smscPort: 12775,
+          windowSize: 100,
+          logger: logger.prefixed(AnsiColors.gray(String(i))),
+          signal: ac.signal,
+          mtPerSecondRateLimit: 100000,
+        });
 
-      await promiseAllSettledTogether({
-        control: control(controller).finally(() => ac.abort()),
-        esme: esmePromise,
-      }, 5000);
-    } finally {
-      abortSignal.removeEventListener("abort", onAbort);
+        await promiseAllSettledTogether({
+          control: control(controller).finally(() => ac.abort()),
+          esme: esmePromise,
+        }, 5000);
+      } catch (e) {
+        logger.error?.("session", i, "failed:", e);
+      } finally {
+        abortSignal.removeEventListener("abort", onAbort);
+      }
+
+      await delay(2000);
     }
   });
 
