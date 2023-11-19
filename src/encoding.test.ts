@@ -1,4 +1,4 @@
-import { assertEquals, decodeHex, encodeHex } from "./deps/std.ts";
+import { decodeHex, encodeHex } from "./deps/std.ts";
 import { SmppEsmClass, SmppFeature, SmppMessageType, SmppMessagingMode } from "./esm_class.ts";
 import { SmppKnownTlvTag, SmppTlvs } from "./tlv.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
@@ -20,6 +20,7 @@ import {
 import { decodeBindRequest, decodeBindResponse, decodeMessageRequest, decodeMessageResponse } from "./decoder.ts";
 import { encodeBindRequest, encodeBindResponse, encodeMessageRequest, encodeMessageResponse } from "./encoder.ts";
 import { SmppRegisteredDelivery } from "./registered_delivery.ts";
+import { assertEquals } from "./deps/std_test.ts";
 
 Deno.test("BindRequest serdes", async (t) => {
   const pdu = {

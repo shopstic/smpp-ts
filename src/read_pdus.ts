@@ -1,59 +1,45 @@
-import { SmppConnection } from "./common.ts";
-
 export async function* readSmppPdus(
-  conn: SmppConnection,
+  reader: ReadableStreamBYOBReader,
 ): AsyncIterable<Uint8Array> {
-  let tempBuffer = new Uint8Array(0);
-
-  async function readBytes(
-    targetBuffer: Uint8Array,
-    start = 0,
-    end = targetBuffer.length,
-  ): Promise<number> {
+  async function read(buffer: ArrayBuffer, offset = 0, length = buffer.byteLength): Promise<ArrayBuffer | null> {
     let bytesRead = 0;
-    while (start < end) {
-      if (tempBuffer.length > 0) {
-        const bytesToCopy = Math.min(end - start, tempBuffer.length);
-        targetBuffer.set(tempBuffer.subarray(0, bytesToCopy), start);
-        tempBuffer = tempBuffer.slice(bytesToCopy);
-        start += bytesToCopy;
-        bytesRead += bytesToCopy;
-      } else {
-        const read = await conn.read(targetBuffer.subarray(start, end));
+    let buf = buffer;
 
-        if (read === null) {
-          return bytesRead;
-        }
+    while (bytesRead < length) {
+      const { done, value } = await reader.read(new Uint8Array(buf, bytesRead + offset, length - bytesRead));
 
-        start += read;
-        bytesRead += read;
+      if (!value) {
+        return null;
+      }
+
+      buf = value.buffer;
+      bytesRead += value.byteLength;
+
+      if (done) {
+        break;
       }
     }
-    return bytesRead;
+
+    return bytesRead < length ? null : buf;
   }
 
   while (true) {
-    const commandLengthBuffer = new Uint8Array(4);
-    const bytesRead = await readBytes(commandLengthBuffer);
+    const commandLengthBuffer = await read(new ArrayBuffer(4));
 
-    if (bytesRead < 4) {
-      // Connection closed or an error occurred
+    if (commandLengthBuffer === null) {
       return;
     }
 
-    const commandLength = new DataView(commandLengthBuffer.buffer).getUint32(0, false);
-    const pduBuffer = new Uint8Array(commandLength);
-    pduBuffer.set(commandLengthBuffer, 0);
+    const commandLength = new DataView(commandLengthBuffer).getUint32(0, false);
+    const pduBuffer = new ArrayBuffer(commandLength);
+    new Uint8Array(pduBuffer, 0, 4).set(new Uint8Array(commandLengthBuffer));
 
-    const remainingBytes = commandLength - 4;
+    const pdu = await read(pduBuffer, 4, commandLength - 4);
 
-    const additionalBytesRead = await readBytes(pduBuffer, 4, commandLength);
-
-    if (additionalBytesRead < remainingBytes) {
-      // Connection closed or an error occurred
+    if (pdu === null) {
       return;
     }
 
-    yield pduBuffer;
+    yield new Uint8Array(pdu);
   }
 }

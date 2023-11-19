@@ -138,7 +138,7 @@ abortSignal.addEventListener("abort", () => {
   Deno.addSignalListener(signal, cb);
 });
 
-const connectionCount = 10;
+const connectionCount = 1;
 
 try {
   const promises = Array.from({ length: connectionCount }).map(async (_, i) => {

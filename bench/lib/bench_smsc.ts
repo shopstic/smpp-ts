@@ -9,7 +9,8 @@ import {
   SmppSupportedCharset,
   SubmitSmResp,
 } from "../../src/common.ts";
-import { assert, deferred } from "../../src/deps/std.ts";
+import { deferred } from "../../src/deps/std.ts";
+import { assert } from "../../src/deps/std_test.ts";
 import { AsyncQueue, promiseTimeout, WindowCorrelationError } from "../../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../../src/esm_class.ts";
 import { SmppMessageState } from "../../src/message_state.ts";
@@ -109,7 +110,8 @@ export async function runBenchSmsc(
 
             const smppPeer = createSmppPeer<string>({
               windowSize,
-              connection,
+              connectionWriter: connection.writable.getWriter(),
+              connectionReader: connection.readable.getReader({ mode: "byob" }),
               enquireLinkIntervalMs: 10_000,
               responseTimeoutMs: 5000,
               signal,
@@ -232,7 +234,11 @@ export async function runBenchSmsc(
           } finally {
             logger.info?.("client ended addr:", remoteAddr, "id:", clientId);
             pendingClients.delete(clientId);
-            connection.close();
+            try {
+              connection.close();
+            } catch (_) {
+              // Ignore
+            }
             stats.connectionCount--;
           }
         })(),

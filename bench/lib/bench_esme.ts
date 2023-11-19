@@ -68,7 +68,8 @@ export async function runBenchEsme<MtCtx>(
     try {
       const smppPeer = createSmppPeer<MtCtx>({
         windowSize,
-        connection,
+        connectionWriter: connection.writable.getWriter(),
+        connectionReader: connection.readable.getReader({ mode: "byob" }),
         responseTimeoutMs: 5000,
         enquireLinkIntervalMs: 10_000,
         signal,
@@ -132,10 +133,10 @@ export async function runBenchEsme<MtCtx>(
       logger.info?.("closing connection");
       try {
         connection.close();
-        logger.info?.("connection closed");
-      } catch (e) {
-        logger.error?.("failed closing connection", e);
+      } catch (_) {
+        // Ignore
       }
+      logger.info?.("connection closed");
     }
   })().finally(() => {
     submitSmQueue.complete();

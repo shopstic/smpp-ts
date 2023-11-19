@@ -273,8 +273,8 @@ export type HexFormOf<T> = {
 };
 
 export interface SmppConnection {
-  read(p: Uint8Array): Promise<number | null>;
-  write(p: Uint8Array): Promise<number>;
+  readonly readable: ReadableStream<Uint8Array>;
+  readonly writable: WritableStream<Uint8Array>;
 }
 
 export function isCommandIdBindRequest(commandId: SmppCommandId): commandId is BindRequest["commandId"] {

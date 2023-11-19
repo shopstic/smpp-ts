@@ -11,7 +11,8 @@ import {
   SubmitSm,
   SubmitSmResp,
 } from "../src/common.ts";
-import { assertEquals, deferred } from "../src/deps/std.ts";
+import { deferred } from "../src/deps/std.ts";
+import { assertEquals } from "../src/deps/std_test.ts";
 import { AsyncQueue, promiseTimeout } from "../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../src/esm_class.ts";
 import { createSmppPeer, PduWithContext } from "../src/peer.ts";
@@ -175,25 +176,11 @@ async function expectDrs(withMessageIds: Set<string>, discardUnmatched = false) 
 }
 
 const esmePromise = (async () => {
-  let connectionExplicitlyClosed = false;
   try {
     const smppPeer = createSmppPeer<MtCtx>({
       windowSize: 10,
-      connection: {
-        async read(p: Uint8Array): Promise<number | null> {
-          try {
-            return await connection.read(p);
-          } catch (e) {
-            if (!connectionExplicitlyClosed) {
-              throw e;
-            }
-            return null;
-          }
-        },
-        write(p: Uint8Array): Promise<number> {
-          return connection.write(p);
-        },
-      },
+      connectionWriter: connection.writable.getWriter(),
+      connectionReader: connection.readable.getReader({ mode: "byob" }),
       responseTimeoutMs: 5000,
       enquireLinkIntervalMs: 5000,
       signal: abortController.signal,
@@ -250,7 +237,6 @@ const esmePromise = (async () => {
     console.error(`Client failed`, e);
   } finally {
     console.error("Closing connection");
-    connectionExplicitlyClosed = true;
     connection.close();
     console.error("Closed connection");
   }

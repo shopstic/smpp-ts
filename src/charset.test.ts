@@ -1,6 +1,6 @@
-import { assertEquals } from "./deps/std.ts";
 import { smppCharsetDecode, smppCharsetEncode } from "./charset.ts";
 import { SmppSupportedCharset } from "./common.ts";
+import { assertEquals } from "./deps/std_test.ts";
 
 Deno.test("round trip encoding ascii", () => {
   const str = "hello world";

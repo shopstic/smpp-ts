@@ -10,7 +10,6 @@ import {
   SmppSupportedCharset,
   SubmitSmResp,
 } from "../src/common.ts";
-import { OsSignal } from "../src/deps/std.ts";
 import { AsyncQueue, promiseTimeout } from "../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../src/esm_class.ts";
 import { SmppMessageState } from "../src/message_state.ts";
@@ -62,7 +61,8 @@ function toDrDate(date: Date): string {
 
           const smppPeer = createSmppPeer<string>({
             windowSize,
-            connection,
+            connectionWriter: connection.writable.getWriter(),
+            connectionReader: connection.readable.getReader({ mode: "byob" }),
             enquireLinkIntervalMs: 5000,
             responseTimeoutMs: 5000,
             signal: abortController.signal,
@@ -188,8 +188,8 @@ function toDrDate(date: Date): string {
   }
 })();
 
-for await (const _ of OsSignal("SIGTERM", "SIGINT")) {
-  console.log(`Got termination signal, going to unbind all clients (${pendingClients.size})`);
+async function terminate(signal: Deno.Signal) {
+  console.log(`Got ${signal} signal, going to unbind all clients (${pendingClients.size})`);
   abortController.abort();
 
   try {
@@ -200,8 +200,17 @@ for await (const _ of OsSignal("SIGTERM", "SIGINT")) {
     );
   } catch (e) {
     console.log("Failed to cleanly unbind all clients in time", e);
+  } finally {
+    server.close();
   }
-  break;
 }
 
-server.close();
+const signals = ["SIGTERM", "SIGINT"] as const;
+
+signals.forEach((signal) => {
+  const callback = () => {
+    Deno.removeSignalListener(signal, callback);
+    terminate(signal);
+  };
+  Deno.addSignalListener(signal, callback);
+});

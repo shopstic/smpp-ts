@@ -12,7 +12,6 @@ import {
   MessageRequest,
   MessageResponse,
   SmppCommandId,
-  SmppConnection,
   SmppPdu,
   SubmitSm,
   SubmitSmResp,
@@ -21,7 +20,7 @@ import {
 } from "./common.ts";
 import { decodePdu } from "./decoder.ts";
 import { readSmppPdus } from "./read_pdus.ts";
-import { deferred, delay, writeAll } from "./deps/std.ts";
+import { deferred, delay } from "./deps/std.ts";
 import { prettifySmppCommandId, prettifySmppCommandStatus } from "./prettify.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
 import {
@@ -101,7 +100,8 @@ export function createSmppPeer<
 >(
   {
     windowSize = 10,
-    connection,
+    connectionWriter,
+    connectionReader,
     enquireLinkIntervalMs,
     signal: externalSignal,
     responseTimeoutMs = 5000,
@@ -109,7 +109,8 @@ export function createSmppPeer<
     tapIncomingPdu,
   }: {
     windowSize: number;
-    connection: SmppConnection;
+    connectionWriter: WritableStreamDefaultWriter<Uint8Array>;
+    connectionReader: ReadableStreamBYOBReader;
     enquireLinkIntervalMs: number;
     signal: AbortSignal;
     responseTimeoutMs?: number;
@@ -120,7 +121,6 @@ export function createSmppPeer<
   type BindHandler = (
     b: BindTx,
   ) => Promise<MessagesHandler<MsgTx, MsgTx, LocalMsgCtx>>;
-
   const internalAc = new AbortController();
   const internalSignal = internalAc.signal;
   const incomingRawQueue = new AsyncQueue<Uint8Array>();
@@ -210,7 +210,8 @@ export function createSmppPeer<
     try {
       for await (const pdu of outgoingQueue.items()) {
         tapOutgoingPdu?.(pdu);
-        await writeAll(connection, encodePdu(pdu));
+        await connectionWriter.ready;
+        await connectionWriter.write(encodePdu(pdu));
       }
     } catch (e) {
       internalAc.abort();
@@ -223,7 +224,7 @@ export function createSmppPeer<
   async function loopIncomingRaw() {
     try {
       for await (
-        const raw of readSmppPdus(connection)
+        const raw of readSmppPdus(connectionReader)
       ) {
         if (incomingRawQueue.isCompleted || !await incomingRawQueue.enqueue(raw)) return;
       }
