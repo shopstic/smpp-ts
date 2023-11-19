@@ -1,10 +1,6 @@
-import { encodeHexString } from "./deps/std.ts";
+import { encodeHex } from "./deps/std.ts";
 import { smppCharsetDecode } from "./charset.ts";
-import {
-  MessageRequest,
-  SmppKnownDataCoding,
-  SmppSupportedCharset,
-} from "./common.ts";
+import { MessageRequest, SmppKnownDataCoding, SmppSupportedCharset } from "./common.ts";
 
 const defaultDcsToCharsetMap = new Map<
   SmppKnownDataCoding,
@@ -32,8 +28,7 @@ export function extractMessagePayload(pdu: MessageRequest): Uint8Array {
 
 export function extractMessageContent(
   pdu: MessageRequest,
-  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> =
-    defaultDcsToCharsetMap,
+  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> = defaultDcsToCharsetMap,
 ): string {
   const payload = extractMessagePayload(pdu);
   const charset = dcsToCharsetMap.get(pdu.dataCoding);
@@ -42,5 +37,5 @@ export function extractMessageContent(
     return smppCharsetDecode(payload, charset);
   }
 
-  return `raw(${encodeHexString(payload)})`;
+  return `raw(${encodeHex(payload)})`;
 }

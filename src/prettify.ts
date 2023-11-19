@@ -1,5 +1,5 @@
 import { Table } from "./deps/cliffy.ts";
-import { encodeHexString } from "./deps/std.ts";
+import { encodeHex } from "./deps/std.ts";
 import { smppCharsetDecode } from "./charset.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
 import {
@@ -19,12 +19,7 @@ import {
   SmppSupportedCharset,
   SmppTon,
 } from "./common.ts";
-import {
-  SmppEsmClass,
-  SmppFeature,
-  SmppMessageType,
-  SmppMessagingMode,
-} from "./esm_class.ts";
+import { SmppEsmClass, SmppFeature, SmppMessageType, SmppMessagingMode } from "./esm_class.ts";
 import { SmppMessageState } from "./message_state.ts";
 import {
   SmppIntermediateNotification,
@@ -54,13 +49,9 @@ const getSmppCommandIdByValueMap = memoize(() =>
   new Map(Array.from(Object.entries(SmppCommandId)).map(([k, v]) => [v, k]))
 );
 
-const getSmppTonByValueMap = memoize(() =>
-  new Map(Array.from(Object.entries(SmppTon)).map(([k, v]) => [v, k]))
-);
+const getSmppTonByValueMap = memoize(() => new Map(Array.from(Object.entries(SmppTon)).map(([k, v]) => [v, k])));
 
-const getSmppNpiByValueMap = memoize(() =>
-  new Map(Array.from(Object.entries(SmppNpi)).map(([k, v]) => [v, k]))
-);
+const getSmppNpiByValueMap = memoize(() => new Map(Array.from(Object.entries(SmppNpi)).map(([k, v]) => [v, k])));
 
 const getSmppTlvTagByValueMap = memoize(() =>
   new Map(Array.from(Object.entries(SmppKnownTlvTag)).map(([k, v]) => [v, k]))
@@ -143,7 +134,7 @@ export function prettifySmppTlvs(tlvs: SmppTlvs): string {
     let prettifiedValue: string;
 
     if (value instanceof Uint8Array) {
-      prettifiedValue = encodeHexString(value);
+      prettifiedValue = encodeHex(value);
     } else if (typeof value === "object") {
       prettifiedValue = JSON.stringify(value);
     } else if (
@@ -161,34 +152,25 @@ export function prettifySmppTlvs(tlvs: SmppTlvs): string {
 }
 
 export function prettifySmppEsmClass(esmClass: SmppEsmClass) {
-  const messagingMode =
-    getSmppMessagingModeByValueMap().get(esmClass.messagingMode) ?? "unknown";
-  const messageType =
-    getSmppMessageTypeByValueMap().get(esmClass.messageType) ?? "unknown";
-  const features = Array.from(esmClass.features).map((feature) =>
-    getSmppFeatureByValueMap().get(feature) ?? "unknown"
-  );
+  const messagingMode = getSmppMessagingModeByValueMap().get(esmClass.messagingMode) ?? "unknown";
+  const messageType = getSmppMessageTypeByValueMap().get(esmClass.messageType) ?? "unknown";
+  const features = Array.from(esmClass.features).map((feature) => getSmppFeatureByValueMap().get(feature) ?? "unknown");
 
-  return `mode=${messagingMode} type=${messageType} features=${
-    features.join(",")
-  }`;
+  return `mode=${messagingMode} type=${messageType} features=${features.join(",")}`;
 }
 
 export function prettifySmppRegisteredDelivery(
   registeredDelivery: SmppRegisteredDelivery,
 ) {
-  const smscDelivery =
-    getSmppSmscDeliveryByValueMap().get(registeredDelivery.smscDelivery) ??
-      "unknown";
-  const smeAcknowledgement =
-    getSmppSmeAcknowledgementByValueMap().get(
-      registeredDelivery.smeAcknowledgement,
-    ) ??
-      "unknown";
-  const intermediateNotification =
-    getSmppIntermediateNotificationByValueMap().get(
-      registeredDelivery.intermediateNotification,
-    ) ?? "unknown";
+  const smscDelivery = getSmppSmscDeliveryByValueMap().get(registeredDelivery.smscDelivery) ??
+    "unknown";
+  const smeAcknowledgement = getSmppSmeAcknowledgementByValueMap().get(
+    registeredDelivery.smeAcknowledgement,
+  ) ??
+    "unknown";
+  const intermediateNotification = getSmppIntermediateNotificationByValueMap().get(
+    registeredDelivery.intermediateNotification,
+  ) ?? "unknown";
 
   return `smsc=${smscDelivery} sme=${smeAcknowledgement} intermediate=${intermediateNotification}`;
 }
@@ -205,8 +187,7 @@ const defaultDcsToCharsetMap = new Map<
 
 export function prettifySmppPdu(
   pdu: SmppPdu,
-  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> =
-    defaultDcsToCharsetMap,
+  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> = defaultDcsToCharsetMap,
 ) {
   const base = {
     commandId: prettifySmppCommandId(pdu.commandId),
@@ -232,9 +213,7 @@ export function prettifySmppPdu(
 
   if (isPduMessageRequest(pdu)) {
     const charset = dcsToCharsetMap?.get(pdu.dataCoding);
-    const shortMessage = charset
-      ? smppCharsetDecode(pdu.shortMessage, charset)
-      : `raw(${encodeHexString(pdu.shortMessage)})`;
+    const shortMessage = charset ? smppCharsetDecode(pdu.shortMessage, charset) : `raw(${encodeHex(pdu.shortMessage)})`;
 
     return {
       ...pdu,
@@ -289,8 +268,7 @@ function getPduKeys(pdu: SmppPdu): string[] {
 
 export function renderSmppPduAsTable<T extends SmppPdu>(
   pdu: T,
-  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> =
-    defaultDcsToCharsetMap,
+  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> = defaultDcsToCharsetMap,
 ) {
   const prettified = prettifySmppPdu(pdu, dcsToCharsetMap);
   const allKeys = getPduKeys(pdu);
@@ -317,8 +295,7 @@ export function renderSmppPduAsTable<T extends SmppPdu>(
 
 export function prettifySmppPdusAsTable<T extends SmppPdu>(
   pdus: T[],
-  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> =
-    defaultDcsToCharsetMap,
+  dcsToCharsetMap: Map<SmppKnownDataCoding, SmppSupportedCharset> = defaultDcsToCharsetMap,
 ) {
   if (pdus.length === 0) {
     return "";

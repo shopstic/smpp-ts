@@ -1,4 +1,4 @@
-import { assertEquals, decodeHexString, encodeHexString } from "./deps/std.ts";
+import { assertEquals, decodeHex, encodeHex } from "./deps/std.ts";
 import { SmppEsmClass, SmppFeature, SmppMessageType, SmppMessagingMode } from "./esm_class.ts";
 import { SmppKnownTlvTag, SmppTlvs } from "./tlv.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
@@ -53,12 +53,12 @@ Deno.test("BindRequest serdes", async (t) => {
   const expectedInHex = BindRequestKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
-    const actualInHex = encodeHexString(encodeBindRequest(pdu));
+    const actualInHex = encodeHex(encodeBindRequest(pdu));
     assertEquals(actualInHex, expectedInHex);
   });
 
   await t.step("decode", () => {
-    const actual = decodeBindRequest(decodeHexString(expectedInHex));
+    const actual = decodeBindRequest(decodeHex(expectedInHex));
     assertEquals(actual, pdu);
   });
 });
@@ -88,12 +88,12 @@ Deno.test("BindResponse", async (t) => {
   const expectedInHex = BindResponseKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
-    const actualInHex = encodeHexString(encodeBindResponse(pdu));
+    const actualInHex = encodeHex(encodeBindResponse(pdu));
     assertEquals(actualInHex, expectedInHex);
   });
 
   await t.step("decode", () => {
-    const actual = decodeBindResponse(decodeHexString(expectedInHex));
+    const actual = decodeBindResponse(decodeHex(expectedInHex));
     assertEquals(actual, pdu);
   });
 });
@@ -162,12 +162,12 @@ Deno.test("MessageRequest", async (t) => {
   const expectedInHex = MessageRequestKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
-    const actualInHex = encodeHexString(encodeMessageRequest(pdu));
+    const actualInHex = encodeHex(encodeMessageRequest(pdu));
     assertEquals(actualInHex, expectedInHex);
   });
 
   await t.step("decode", () => {
-    const actual = decodeMessageRequest(decodeHexString(expectedInHex));
+    const actual = decodeMessageRequest(decodeHex(expectedInHex));
     assertEquals(actual, pdu);
   });
 });
@@ -194,12 +194,12 @@ Deno.test("MessageResponse", async (t) => {
   const expectedInHex = MessageResponseKeys.map((key) => expected[key].toLowerCase()).join("");
 
   await t.step("encode", () => {
-    const actualInHex = encodeHexString(encodeMessageResponse(pdu));
+    const actualInHex = encodeHex(encodeMessageResponse(pdu));
     assertEquals(actualInHex, expectedInHex);
   });
 
   await t.step("decode", () => {
-    const actual = decodeMessageResponse(decodeHexString(expectedInHex));
+    const actual = decodeMessageResponse(decodeHex(expectedInHex));
     assertEquals(actual, pdu);
   });
 });

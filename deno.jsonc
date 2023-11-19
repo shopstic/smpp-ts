@@ -1,5 +1,6 @@
 {
   "tasks": {
+    "test": "deno test ./src/**/*.test.ts",
     "check": "rm -f deno.lock && deno check ./src/**/*.ts ./bench/**/*.ts",
     "bench_esme": "deno run -A --check ./bench/run_bench_esme.ts",
     "bench_smsc": "deno run -A --check ./bench/run_bench_smsc.ts"

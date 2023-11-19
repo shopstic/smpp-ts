@@ -1,4 +1,4 @@
-import { encodeHexString } from "./deps/std.ts";
+import { encodeHex } from "./deps/std.ts";
 import { smppCharsetEncode } from "./charset.ts";
 import { SmppSupportedCharset, SmppTlv } from "./common.ts";
 import { SmppMessageState } from "./message_state.ts";
@@ -110,7 +110,7 @@ export function smppTlvDecodeNetworkErrorCode(
   if (value.length !== 3) {
     throw new Error(
       "NetworkErrorCode TLV value must be 3 bytes long, instead got " +
-        encodeHexString(value),
+        encodeHex(value),
     );
   }
 
@@ -132,7 +132,7 @@ export function smppTlvDecodeMessageState(value: Uint8Array): SmppMessageState {
   if (value.length !== 1) {
     throw new Error(
       "MessageState TLV value must be 1 byte long, instead got " +
-        encodeHexString(value),
+        encodeHex(value),
     );
   }
 
