@@ -106,7 +106,7 @@ export async function runBenchSmsc(
           try {
             logger.info?.("client started addr:", remoteAddr, "id:", clientId);
 
-            const deliverSmQueue = new AsyncQueue<PduWithContext<DeliverSm, string>>(windowSize + 10);
+            const deliverSmQueue = new AsyncQueue<PduWithContext<DeliverSm, string>>(Number.MAX_SAFE_INTEGER);
 
             const smppPeer = createSmppPeer<string>({
               windowSize,
@@ -199,7 +199,7 @@ export async function runBenchSmsc(
                       ]),
                     };
 
-                    await deliverSmQueue.enqueue({
+                    deliverSmQueue.enqueue({
                       pdu: deliverSm,
                       context: messageId,
                     });
