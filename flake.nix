@@ -13,7 +13,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
           hotPotPkgs = hotPot.packages.${system};
-          deno = hotPotPkgs.deno;
+          deno = hotPotPkgs.deno_1_41_x;
           vscodeSettings = pkgs.writeTextFile {
             name = "vscode-settings.json";
             text = builtins.toJSON {
