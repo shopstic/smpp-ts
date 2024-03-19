@@ -1,19 +1,9 @@
 import { AnsiColors, DefaultLogger } from "./deps.ts";
 import { BenchSmscStats, runBenchSmsc } from "./lib/bench_smsc.ts";
+import { createMainSignal } from "./lib/main_signal.ts";
 
 const logger = DefaultLogger.prefixed(AnsiColors.gray("smsc"));
-
-const abortController = new AbortController();
-const abortSignal = abortController.signal;
-
-(["SIGTERM", "SIGINT"] as const).forEach((signal) => {
-  const cb = () => {
-    logger.info?.("got signal", signal);
-    abortController.abort();
-    Deno.removeSignalListener(signal, cb);
-  };
-  Deno.addSignalListener(signal, cb);
-});
+const { signal: mainSignal } = createMainSignal(logger);
 
 let lastStats: BenchSmscStats | undefined = undefined;
 let getStats: undefined | (() => BenchSmscStats);
@@ -31,7 +21,7 @@ const timer = setInterval(() => {
   lastStats = structuredClone(stats);
 }, 1000);
 
-abortSignal.addEventListener("abort", () => {
+mainSignal.addEventListener("abort", () => {
   clearInterval(timer);
 }, { once: true });
 
@@ -40,7 +30,7 @@ await runBenchSmsc({
   hostname: "0.0.0.0",
   port: 12775,
   logger,
-  signal: abortSignal,
+  signal: mainSignal,
   windowSize: 100,
   statsGetter: (getter) => {
     getStats = getter;

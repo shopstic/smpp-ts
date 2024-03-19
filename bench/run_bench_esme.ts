@@ -8,6 +8,7 @@ import { SmppRegisteredDelivery } from "../src/registered_delivery.ts";
 import { SmppTlvs } from "../src/tlv.ts";
 import { AnsiColors, DefaultLogger } from "./deps.ts";
 import { BenchEsmeController, runBenchEsme } from "./lib/bench_esme.ts";
+import { createMainSignal } from "./lib/main_signal.ts";
 
 const logger = DefaultLogger.prefixed(AnsiColors.gray("esme"));
 
@@ -49,26 +50,28 @@ function createSubmitSm(fields: SubmitSmWithDefaults): SubmitSm {
   };
 }
 
-const abortController = new AbortController();
-const abortSignal = abortController.signal;
-
 const stats = {
   mtTotal: 0,
   mtRespTotal: 0,
   drTotal: 0,
 };
 
+const { signal: mainSignal, abortController: mainAbortController } = createMainSignal(logger);
+mainSignal.addEventListener("abort", () => {
+  clearInterval(timer);
+}, { once: true });
+
 async function control(
   { submitSmQueue, submitSmRespQueue, deliverSmQueue }: BenchEsmeController<string>,
 ): Promise<void> {
   const mtFlowPromise = (async () => {
     try {
-      while (!abortSignal.aborted) {
+      while (!mainSignal.aborted) {
         const context = crypto.randomUUID();
         const pdu = createSubmitSm({
           sourceAddr: "+12001234567",
           destinationAddr: "+12001234568",
-          shortMessage: smppCharsetEncode(`Benchmark message ${context} in ASCII`, SmppSupportedCharset.Ascii),
+          shortMessage: smppCharsetEncode(`Benchmark message ${context} in ASCII`, SmppSupportedCharset.Ucs2),
           dataCoding: SmppKnownDataCoding.Ia5,
         });
 
@@ -115,6 +118,7 @@ async function control(
 }
 
 let lastStats: typeof stats | undefined = undefined;
+const connectionCount = 10;
 
 const timer = setInterval(() => {
   const { mtTotal, mtRespTotal, drTotal } = stats;
@@ -125,27 +129,12 @@ const timer = setInterval(() => {
   lastStats = structuredClone(stats);
 }, 1000);
 
-abortSignal.addEventListener("abort", () => {
-  clearInterval(timer);
-}, { once: true });
-
-(["SIGTERM", "SIGINT"] as const).forEach((signal) => {
-  const cb = () => {
-    logger.info?.("got signal", signal);
-    abortController.abort();
-    Deno.removeSignalListener(signal, cb);
-  };
-  Deno.addSignalListener(signal, cb);
-});
-
-const connectionCount = 1;
-
 try {
   const promises = Array.from({ length: connectionCount }).map(async (_, i) => {
-    while (!abortSignal.aborted) {
+    while (!mainSignal.aborted) {
       const ac = new AbortController();
       const onAbort = () => ac.abort();
-      abortSignal.addEventListener("abort", onAbort, { once: true });
+      mainSignal.addEventListener("abort", onAbort, { once: true });
 
       try {
         const { controller, esmePromise } = await runBenchEsme<string>({
@@ -166,14 +155,22 @@ try {
       } catch (e) {
         logger.error?.("session", i, "failed:", e);
       } finally {
-        abortSignal.removeEventListener("abort", onAbort);
+        mainSignal.removeEventListener("abort", onAbort);
       }
 
-      await delay(2000);
+      try {
+        await delay(2000, { signal: mainSignal });
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          // Ignore
+        } else {
+          throw e;
+        }
+      }
     }
   });
 
   await Promise.all(promises);
 } finally {
-  abortController.abort();
+  mainAbortController.abort();
 }
