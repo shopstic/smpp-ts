@@ -19,5 +19,8 @@
       "src/",
       "examples/"
     ]
+  },
+  "imports": {
+    "@wok/utils": "jsr:@wok/utils@^1.1.5"
   }
 }

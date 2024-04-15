@@ -1,4 +1,3 @@
-export { decodeHex, encodeHex } from "https://deno.land/std@0.205.0/encoding/hex.ts";
-export { parse as parseDate } from "https://deno.land/std@0.205.0/datetime/parse.ts";
-export { delay } from "https://deno.land/std@0.205.0/async/delay.ts";
-export { type Deferred, deferred } from "https://deno.land/std@0.205.0/async/deferred.ts";
+export { decodeHex, encodeHex } from "jsr:@std/encoding@~0.221.0/hex";
+export { parse as parseDate } from "jsr:@std/datetime@~0.221.0/parse";
+export { delay } from "jsr:@std/async@~0.221.0/delay";

@@ -11,7 +11,6 @@ import {
   SubmitSm,
   SubmitSmResp,
 } from "../src/common.ts";
-import { deferred } from "../src/deps/std.ts";
 import { assertEquals } from "../src/deps/std_test.ts";
 import { AsyncQueue, promiseTimeout } from "../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../src/esm_class.ts";
@@ -212,18 +211,18 @@ const esmePromise = (async () => {
             await submitSmRespQueue.enqueue({ request, response });
           },
           async handleRemoteMessageRequest(request: DeliverSm) {
-            const deferredResponse = deferred<DeliverSmResp>();
+            const { resolve, promise } = Promise.withResolvers<DeliverSmResp>();
 
             deliverSmQueue.enqueue({
               pdu: request,
               respond: async (response: DeliverSmResp) => {
-                deferredResponse.resolve(response);
-                await deferredResponse;
+                resolve(response);
+                await promise;
                 return;
               },
             });
 
-            return await deferredResponse;
+            return await promise;
           },
         }),
     });

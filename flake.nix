@@ -13,7 +13,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
           hotPotPkgs = hotPot.packages.${system};
-          deno = hotPotPkgs.deno_1_41_x;
+          deno = hotPotPkgs.deno_1_42_x;
           vscodeSettings = pkgs.writeTextFile {
             name = "vscode-settings.json";
             text = builtins.toJSON {
@@ -37,15 +37,22 @@
               };
               "nix.enableLanguageServer" = true;
               "nix.formatterPath" = pkgs.nixpkgs-fmt + "/bin/nixpkgs-fmt";
-              "nix.serverPath" = pkgs.rnix-lsp + "/bin/rnix-lsp";
+              "nix.serverSettings" = {
+                "nil" = {
+                  "formatting" = {
+                    "command" = [ "nixpkgs-fmt" ];
+                  };
+                };
+              };
+              "nix.serverPath" = pkgs.nil + "/bin/nil";
             };
           };
           runtimeInputs = builtins.attrValues
             {
               inherit deno;
+              # inherit (pkgs) nodejs_21;
             };
-        in
-        rec {
+        in {
           devShell = pkgs.mkShellNoCC {
             shellHook = ''
               mkdir -p ./.vscode

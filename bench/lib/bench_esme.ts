@@ -1,7 +1,7 @@
 import { SmppKnownCommandStatus } from "../../src/command_status.ts";
 import { DeliverSm, DeliverSmResp, SmppCommandId, SmppNpi, SmppTon, SubmitSm, SubmitSmResp } from "../../src/common.ts";
 import { SmppDeliveryReceipt } from "../../src/delivery_receipt.ts";
-import { AsyncQueue, deferred, promiseTimeout, WindowCorrelationError } from "../../src/deps/utils.ts";
+import { AsyncQueue, promiseTimeout, WindowCorrelationError } from "../../src/deps/utils.ts";
 import { createSmppPeer, PduTx, PduWithContext } from "../../src/peer.ts";
 import { renderSmppPduAsTable } from "../../src/prettify.ts";
 import { Logger } from "../deps.ts";
@@ -103,18 +103,18 @@ export async function runBenchEsme<MtCtx>(
               await submitSmRespQueue.enqueue({ request, response });
             },
             async handleRemoteMessageRequest(request: DeliverSm) {
-              const deferredResponse = deferred<DeliverSmResp>();
+              const { resolve, promise } = Promise.withResolvers<DeliverSmResp>();
 
               await deliverSmQueue.enqueue({
                 pdu: request,
                 respond: async (response: DeliverSmResp) => {
-                  deferredResponse.resolve(response);
-                  await deferredResponse;
+                  resolve(response);
+                  await promise;
                   return;
                 },
               });
 
-              return await deferredResponse;
+              return await promise;
             },
           }),
       });

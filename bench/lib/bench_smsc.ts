@@ -9,7 +9,6 @@ import {
   SmppSupportedCharset,
   SubmitSmResp,
 } from "../../src/common.ts";
-import { deferred } from "../../src/deps/std.ts";
 import { assert } from "../../src/deps/std_test.ts";
 import { AsyncQueue, promiseTimeout, WindowCorrelationError } from "../../src/deps/utils.ts";
 import { SmppEsmClass, SmppMessageType, SmppMessagingMode } from "../../src/esm_class.ts";
@@ -81,12 +80,12 @@ export async function runBenchSmsc(
 
   function onAbort() {
     logger.info?.("got termination signal, going to unbind all clients count:", pendingClients.size);
-    terminationPromise.resolve();
+    terminationDeferred.resolve();
   }
 
   signal.addEventListener("abort", onAbort);
 
-  const terminationPromise = deferred<void>();
+  const terminationDeferred = Promise.withResolvers<void>();
 
   const handlerPromise = (async () => {
     for await (const connection of server) {
@@ -246,9 +245,9 @@ export async function runBenchSmsc(
 
       if (signal.aborted) break;
     }
-  })().finally(() => terminationPromise.resolve());
+  })().finally(() => terminationDeferred.resolve());
 
-  await terminationPromise;
+  await terminationDeferred.promise;
 
   try {
     await promiseTimeout(

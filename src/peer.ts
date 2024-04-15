@@ -20,7 +20,7 @@ import {
 } from "./common.ts";
 import { decodePdu } from "./decoder.ts";
 import { readSmppPdus } from "./read_pdus.ts";
-import { deferred, delay } from "./deps/std.ts";
+import { delay } from "./deps/std.ts";
 import { prettifySmppCommandId, prettifySmppCommandStatus } from "./prettify.ts";
 import { SmppKnownCommandStatus } from "./command_status.ts";
 import {
@@ -144,7 +144,7 @@ export function createSmppPeer<
 
   let outstandingRemoteUnbindRequest: Unbind | null = null;
 
-  const connReadPromise = deferred<void>();
+  const connReadDeferred = Promise.withResolvers<void>();
 
   const remoteResponseQueues = {
     bind: new AsyncQueue<PduTx<BindRequest, BindResponse>>(),
@@ -162,7 +162,7 @@ export function createSmppPeer<
     remoteMessageRequestQueue.complete();
     localMessageResponsePromiseQueue.complete();
     localMessageRequestQueue?.complete();
-    connReadPromise.resolve();
+    connReadDeferred.resolve();
   }
 
   function externalAbort() {
@@ -230,7 +230,7 @@ export function createSmppPeer<
       }
     } catch (e) {
       if (!incomingRawQueue.isCompleted) {
-        connReadPromise.reject(e);
+        connReadDeferred.reject(e);
       }
     } finally {
       incomingRawQueue.complete();
@@ -599,7 +599,7 @@ export function createSmppPeer<
       loopIncomingRaw();
 
       const promises = {
-        connRead: connReadPromise,
+        connRead: connReadDeferred.promise,
         outgoing: loopOutgoing(),
         incoming: loopIncoming(),
         localRequests: loopLocalRequests(),

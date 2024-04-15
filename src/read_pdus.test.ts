@@ -1,4 +1,4 @@
-import { deferred, delay } from "./deps/std.ts";
+import { delay } from "./deps/std.ts";
 import { assertEquals } from "./deps/std_test.ts";
 import { readSmppPdus } from "./read_pdus.ts";
 
@@ -8,7 +8,7 @@ type QueueItemResolver = {
 };
 
 class MockReader implements ReadableStreamBYOBReader {
-  readonly closed = deferred<void>();
+  readonly closed = Promise.withResolvers<void>().promise;
   // deno-lint-ignore no-explicit-any
   cancel(_reason?: any) {
     return Promise.reject(new Error("Not implemented"));

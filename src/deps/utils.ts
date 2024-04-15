@@ -1,3 +1,3 @@
-export * from "https://deno.land/x/utils@2.18.7/async_queue.ts";
-export * from "https://deno.land/x/utils@2.18.7/windowing.ts";
-export * from "https://deno.land/x/utils@2.18.7/async_utils.ts";
+export * from "jsr:@wok/utils@~1.1.5/async-queue";
+export * from "jsr:@wok/utils@~1.1.5/windowing";
+export * from "jsr:@wok/utils@~1.1.5/async";
